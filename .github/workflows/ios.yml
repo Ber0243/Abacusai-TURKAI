@@ -1,0 +1,62 @@
+
+name: Build TURKAI iOS IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - "TURKAI-asistan-ipa.zip"
+      - ".github/workflows/ios.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Check ZIP archive
+        run: |
+          test -f TURKAI-asistan-ipa.zip
+          unzip -t TURKAI-asistan-ipa.zip
+
+      - name: Extract project
+        run: |
+          mkdir -p extracted
+          unzip -q TURKAI-asistan-ipa.zip -d extracted
+          test -f extracted/turkai-main/ios-kabuk/scripts/ci-build.sh
+
+      - name: Build iOS application
+        working-directory: extracted/turkai-main
+        run: |
+          chmod +x ios-kabuk/scripts/ci-build.sh
+          bash ios-kabuk/scripts/ci-build.sh
+
+      - name: Find IPA
+        run: |
+          IPA=$(find . -type f -name "*.ipa" -print -quit)
+          if [ -z "$IPA" ]; then
+            echo "IPA bulunamadı. Derleme betiğinin çıktısını kontrol et."
+            exit 1
+          fi
+          mkdir -p ../ipa-output
+          cp "$IPA" ../ipa-output/TURKAI-unsigned.ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TURKAI-unsigned-IPA
+          path: ipa-output/TURKAI-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 14
