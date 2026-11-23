@@ -12,8 +12,13 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: turkai-ios-ipa-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build:
+    name: Build unsigned IPA
     runs-on: macos-14
     timeout-minutes: 60
 
@@ -28,11 +33,13 @@ jobs:
 
       - name: Check ZIP archive
         run: |
+          set -euxo pipefail
           test -f TURKAI-asistan-ipa.zip
           unzip -t TURKAI-asistan-ipa.zip
 
       - name: Extract project
         run: |
+          set -euxo pipefail
           mkdir -p extracted
           unzip -q TURKAI-asistan-ipa.zip -d extracted
           test -f extracted/turkai-main/ios-kabuk/scripts/ci-build.sh
@@ -40,18 +47,23 @@ jobs:
       - name: Build iOS application
         working-directory: extracted/turkai-main
         run: |
+          set -euxo pipefail
           chmod +x ios-kabuk/scripts/ci-build.sh
           bash ios-kabuk/scripts/ci-build.sh
 
       - name: Find IPA
         run: |
-          IPA=$(find . -type f -name "*.ipa" -print -quit)
+          set -euxo pipefail
+          IPA=$(find extracted -type f -name "*.ipa" -print -quit)
+
           if [ -z "$IPA" ]; then
-            echo "IPA bulunamadı. Derleme betiğinin çıktısını kontrol et."
+            echo "IPA bulunamadi!"
             exit 1
           fi
-          mkdir -p ../ipa-output
-          cp "$IPA" ../ipa-output/TURKAI-unsigned.ipa
+
+          mkdir -p ipa-output
+          cp "$IPA" ipa-output/TURKAI-unsigned.ipa
+          ls -lh ipa-output/
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
